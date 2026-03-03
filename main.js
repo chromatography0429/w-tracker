@@ -1,29 +1,42 @@
-const { app, BrowserWindow } = require("electron");
-const {ipcMain} = require('electron')
+const { app, BrowserWindow, ipcMain } = require("electron");
+const fs = require("fs");
+const path = require("path");
 
-ipcMain.on('close',(e, args)=> {
-  var fileName = 'WorkTrackSave.txt'
-  const fs = require('fs');
+const SAVE_FILE_NAME = "WorkTrackSave.txt";
+const SAVE_FILE_PATH = path.join(app.getPath("userData"), SAVE_FILE_NAME);
+
+ipcMain.on("close", async (event, args = []) => {
   try {
-    var result;
-    var data = fs.readFileSync(fileName, {encoding: 'utf8', flag:'r'});
-    if (data)
-    {
-      var dataObject = data.split('\n');
-      var lastData = dataObject[dataObject.length-2];
+    const [arg0 = "", arg1 = "", arg2 = ""] = args;
+    const today = getTodayDate();
 
-      if (getTodayDate() == lastData.split(":")[0]) {
-        result = dataObject.splice(dataObject.length-2, 0).join('\n');;
-        fs.writeFileSync(fileName, result, 'utf-8');
+    let fileContent = "";
+
+    if (fs.existsSync(SAVE_FILE_PATH)) {
+      fileContent = fs.readFileSync(SAVE_FILE_PATH, { encoding: "utf8" });
+    }
+
+    const lines = fileContent ? fileContent.split("\n").filter(Boolean) : [];
+
+    // Remove the last entry if it's from today
+    if (lines.length > 0) {
+      const lastLine = lines[lines.length - 1];
+      const [lastDate] = lastLine.split(":");
+
+      if (lastDate === today) {
+        lines.pop();
       }
     }
-    fs.appendFileSync(fileName, getTodayDate() + ":" + String(args[0]) + ":" + String(args[1]) + ":" + String(args[2]) + "\n");
+
+    lines.push(`${today}:${String(arg0)}:${String(arg1)}:${String(arg2)}`);
+
+    fs.writeFileSync(SAVE_FILE_PATH, lines.join("\n") + "\n", "utf8");
+  } catch (error) {
+    console.error("Error while saving work track data:", error);
+  } finally {
+    app.quit();
   }
-  catch(e) { 
-    console.log(e) 
-  }
-  app.quit();
-})
+});
 
 app.whenReady().then(createWindow);
 
@@ -33,25 +46,22 @@ function createWindow() {
     height: 130,
     resizable: true,
     frame: false,
+    transparent: true,
     webPreferences: {
       nodeIntegration: true,
-      enableRemoteModule: true,
       contextIsolation: false,
     },
-    transparent:true
   });
-  win.setAlwaysOnTop(true, 'screen');
+
+  win.setAlwaysOnTop(true, "screen");
   win.loadFile("src/index.html");
 }
 
 function getTodayDate() {
   const today = new Date();
-    const yyyy = today.getFullYear();
-    let mm = today.getMonth() + 1; // Months start at 0!
-    let dd = today.getDate();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
 
-    if (dd < 10) dd = '0' + dd;
-    if (mm < 10) mm = '0' + mm;
-
-    return formattedToday = mm + '/' + dd + '/' + yyyy;
+  return `${mm}/${dd}/${yyyy}`;
 }
