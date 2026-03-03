@@ -1,34 +1,61 @@
-const { app, BrowserWindow } = require("electron");
-const {ipcMain} = require('electron')
+const { app, BrowserWindow, ipcMain } = require("electron");
+const fs = require("fs");
 
-ipcMain.on('close',(e, args)=> {
-  var fileName = 'WorkTrackSave.txt'
-  const fs = require('fs');
+const SAVE_FILE_NAME = "WorkTrackSave.txt";
+
+ipcMain.on("close", (event, args) => {
   try {
-    var result;
-    var data = fs.readFileSync(fileName, {encoding: 'utf8', flag:'r'});
-    if (data)
-    {
-      var dataObject = data.split('\n');
-      var lastData = dataObject[dataObject.length-2];
+    const today = getTodayDate();
+    let fileContent;
 
-      if (getTodayDate() == lastData.split(":")[0]) {
-        result = dataObject.splice(dataObject.length-2, 0).join('\n');;
-        fs.writeFileSync(fileName, result, 'utf-8');
+    try {
+      fileContent = fs.readFileSync(SAVE_FILE_NAME, {
+        encoding: "utf8",
+        flag: "r",
+      });
+    } catch (readError) {
+      // If the file does not exist yet, we'll create it when appending below.
+      fileContent = null;
+    }
+
+    if (fileContent) {
+      const lines = fileContent.split("\n");
+      const lastDataLine = lines[lines.length - 2];
+
+      if (lastDataLine) {
+        const lastDate = lastDataLine.split(":")[0];
+
+        if (today === lastDate) {
+          const updatedContent = lines
+            .splice(lines.length - 2, 0)
+            .join("\n");
+          fs.writeFileSync(SAVE_FILE_NAME, updatedContent, "utf-8");
+        }
       }
     }
-    fs.appendFileSync(fileName, getTodayDate() + ":" + String(args[0]) + ":" + String(args[1]) + ":" + String(args[2]) + "\n");
+
+    const entry =
+      today +
+      ":" +
+      String(args[0]) +
+      ":" +
+      String(args[1]) +
+      ":" +
+      String(args[2]) +
+      "\n";
+
+    fs.appendFileSync(SAVE_FILE_NAME, entry);
+  } catch (error) {
+    console.log(error);
   }
-  catch(e) { 
-    console.log(e) 
-  }
+
   app.quit();
-})
+});
 
 app.whenReady().then(createWindow);
 
 function createWindow() {
-  const win = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 300,
     height: 130,
     resizable: true,
@@ -38,20 +65,21 @@ function createWindow() {
       enableRemoteModule: true,
       contextIsolation: false,
     },
-    transparent:true
+    transparent: true,
   });
-  win.setAlwaysOnTop(true, 'screen');
-  win.loadFile("src/index.html");
+
+  window.setAlwaysOnTop(true, "screen");
+  window.loadFile("src/index.html");
 }
 
 function getTodayDate() {
   const today = new Date();
-    const yyyy = today.getFullYear();
-    let mm = today.getMonth() + 1; // Months start at 0!
-    let dd = today.getDate();
+  const yyyy = today.getFullYear();
+  let mm = today.getMonth() + 1; // Months start at 0
+  let dd = today.getDate();
 
-    if (dd < 10) dd = '0' + dd;
-    if (mm < 10) mm = '0' + mm;
+  if (dd < 10) dd = "0" + dd;
+  if (mm < 10) mm = "0" + mm;
 
-    return formattedToday = mm + '/' + dd + '/' + yyyy;
+  return mm + "/" + dd + "/" + yyyy;
 }
